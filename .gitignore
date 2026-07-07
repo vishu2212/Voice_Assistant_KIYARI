@@ -1,0 +1,24 @@
+# Python virtual environments
+backend/venv/
+backend/.venv/
+**/__pycache__/
+*.pyc
+
+# ESP-IDF build output
+firmware/kiyari-esp32/build/
+firmware/kiyari-esp32/sdkconfig
+firmware/kiyari-esp32/sdkconfig.old
+
+# Temporary audio directories & files
+backend/temp/
+*.wav
+*.pcm
+
+# Large model weights (too big for GitHub)
+models/
+
+# VS Code & local configs
+.vscode/
+.idea/
+.env
+*.log
