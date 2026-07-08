@@ -18,18 +18,18 @@ class AudioService:
         data = audio_array.astype(np.float32)
         data = data - np.mean(data)
         
-        # 2. High-pass filter (Pre-emphasis y[n] = x[n] - 0.95 * x[n-1])
+        # 2. Noise Gate: check peak on raw DC-removed signal before filtering
+        # Threshold of 250 is very safe (approx 0.7% of full scale)
+        peak = np.max(np.abs(data))
+        if peak < 250:
+            logger.info(f"Noise Gate Triggered: Peak amplitude ({peak:.1f}) is below threshold (250). Silencing audio.")
+            return np.zeros_like(audio_array)
+            
+        # 3. High-pass filter (Pre-emphasis y[n] = x[n] - 0.95 * x[n-1])
         # This filters out low frequency rumble (vents, fans, AC) and highlights vocal frequencies.
         filtered = np.zeros_like(data)
         filtered[0] = data[0]
         filtered[1:] = data[1:] - 0.95 * data[:-1]
-        
-        # 3. Noise Gate: if the peak level is below threshold, silence the entire buffer.
-        # This prevents Whisper from wasting time trying to transcribe background noise.
-        peak = np.max(np.abs(filtered))
-        if peak < 1000: # Quiet noise threshold (approx 3% amplitude)
-            logger.info(f"Noise Gate Triggered: Peak amplitude ({peak:.1f}) is below threshold (1000). Silencing audio.")
-            return np.zeros_like(audio_array)
             
         # Scale back and clip to standard int16 range
         filtered = np.clip(filtered, -32768, 32767)
