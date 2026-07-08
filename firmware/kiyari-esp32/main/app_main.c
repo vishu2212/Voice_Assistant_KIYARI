@@ -33,6 +33,76 @@ static esp_websocket_client_handle_t ws_client = NULL;
 static bool ws_connected = false;
 static app_state_t g_state = APP_BOOT;
 
+static char speaking_lines[32][24];
+static int speaking_line_count = 0;
+static int speaking_scroll_index = 0;
+static int speaking_scroll_timer = 0;
+
+static void wrap_text_to_lines(const char* str, char lines[32][24], int* line_count) {
+    int count = 0;
+    int col_chars = 21; // 128 / 6 = 21 chars max per line
+    char word[32];
+    int word_len = 0;
+    char current_line[32] = "";
+    int current_len = 0;
+    
+    *line_count = 0;
+    
+    while (*str && count < 32) {
+        if (*str == ' ' || *str == '\n') {
+            if (word_len > 0) {
+                // Check if word fits in current line
+                if (current_len + (current_len > 0 ? 1 : 0) + word_len <= col_chars) {
+                    if (current_len > 0) {
+                        strcat(current_line, " ");
+                        current_len++;
+                    }
+                    strcat(current_line, word);
+                    current_len += word_len;
+                } else {
+                    // Push current line
+                    if (count < 32) {
+                        strcpy(lines[count++], current_line);
+                    }
+                    strcpy(current_line, word);
+                    current_len = word_len;
+                }
+                word_len = 0;
+            }
+            if (*str == '\n' && current_len > 0) {
+                if (count < 32) {
+                    strcpy(lines[count++], current_line);
+                }
+                current_line[0] = '\0';
+                current_len = 0;
+            }
+            str++;
+        } else {
+            if (word_len < 31) {
+                word[word_len++] = *str;
+                word[word_len] = '\0';
+            }
+            str++;
+        }
+    }
+    
+    // Add last word/line if any
+    if (word_len > 0) {
+        if (current_len + (current_len > 0 ? 1 : 0) + word_len <= col_chars) {
+            if (current_len > 0) strcat(current_line, " ");
+            strcat(current_line, word);
+        } else {
+            if (count < 32) strcpy(lines[count++], current_line);
+            strcpy(current_line, word);
+        }
+    }
+    if (current_line[0] != '\0' && count < 32) {
+        strcpy(lines[count++], current_line);
+    }
+    
+    *line_count = count;
+}
+
 static void oled_print_wrapped_string(oled_display_t* dev, int page_start, const char* label, const char* str) {
     oled_print_string(dev, 0, page_start, label);
     int current_page = page_start + 1;
@@ -175,14 +245,29 @@ static void display_animation_task(void *pvParameters) {
             frame++;
             vTaskDelay(pdMS_TO_TICKS(100));
         } else if (g_state == APP_SPEAKING) {
-            // Erase the top-right block (x=95 to 127, y=0 to 15) in local buffer
-            for (int x = 95; x < 128; x++) {
-                for (int y = 0; y < 16; y++) {
-                    oled_draw_pixel(&display_device, x, y, false);
-                }
+            oled_clear(&display_device);
+            oled_print_string(&display_device, 0, 1, "KIYARI");
+            
+            // Print up to 4 lines of the wrapped response starting from speaking_scroll_index
+            int render_page = 3;
+            for (int i = speaking_scroll_index; i < speaking_line_count && render_page < 7; i++) {
+                oled_print_string(&display_device, 0, render_page, speaking_lines[i]);
+                render_page++;
             }
+            
+            // Draw top-right equalizer animation
             draw_speaking_animation(&display_device, frame);
             oled_refresh(&display_device);
+            
+            // Scroll logic: scroll every 15 frames (approx 1.5 seconds)
+            speaking_scroll_timer++;
+            if (speaking_scroll_timer >= 15) {
+                speaking_scroll_timer = 0;
+                if (speaking_scroll_index + 4 < speaking_line_count) {
+                    speaking_scroll_index++;
+                }
+            }
+            
             frame++;
             vTaskDelay(pdMS_TO_TICKS(100));
         } else {
@@ -289,13 +374,14 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
                         if (event_item && event_item->valuestring) {
                             if (strcmp(event_item->valuestring, "speaking") == 0) {
                                 cJSON *resp_item = cJSON_GetObjectItem(root, "response");
-                                update_state(APP_SPEAKING);
                                 if (resp_item && resp_item->valuestring) {
-                                    oled_clear(&display_device);
-                                    oled_print_string(&display_device, 0, 1, "KIYARI");
-                                    oled_print_wrapped_string(&display_device, 3, "Reply:", resp_item->valuestring);
-                                    oled_refresh(&display_device);
+                                    wrap_text_to_lines(resp_item->valuestring, speaking_lines, &speaking_line_count);
+                                    speaking_scroll_index = 0;
+                                    speaking_scroll_timer = 0;
+                                } else {
+                                    speaking_line_count = 0;
                                 }
+                                update_state(APP_SPEAKING);
                                 speaker_start(&spk_device);
                             } else if (strcmp(event_item->valuestring, "done") == 0) {
                                 // Wait for the ring buffer to be empty before stopping the speaker
