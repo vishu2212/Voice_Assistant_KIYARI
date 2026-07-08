@@ -39,11 +39,7 @@ class WhisperService:
                 audio_path,
                 language="en",
                 beam_size=1,
-                vad_filter=True,
-                vad_parameters=dict(
-                    threshold=0.6,
-                    min_speech_duration_ms=250
-                )
+                vad_filter=False
             )
             logger.info(f"Language: {info.language} (probability: {info.language_probability:.2f})")
             
