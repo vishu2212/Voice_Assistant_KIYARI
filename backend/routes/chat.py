@@ -168,23 +168,9 @@ async def post_chat(
         logger.info(f"Assistant Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
         
-        # Parse potential bilingual format: [HINDI] ... [ENGLISH] ...
-        speech_text = assistant_reply
-        display_text = assistant_reply
-        if "[HINDI]" in assistant_reply and "[ENGLISH]" in assistant_reply:
-            try:
-                parts = assistant_reply.split("[ENGLISH]")
-                hindi_part = parts[0].replace("[HINDI]", "").strip()
-                english_part = parts[1].strip()
-                speech_text = hindi_part
-                display_text = english_part
-                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (English): '{display_text}'")
-            except Exception as pe:
-                logger.error(f"Failed to parse bilingual reply: {pe}")
-        
         # 6. Synthesize assistant response text to Speech WAV file (measure TTS latency)
         start_tts = time.perf_counter()
-        output_wav_path = await tts_service.speak(speech_text)
+        output_wav_path = await tts_service.speak(assistant_reply)
         tts_ms = int((time.perf_counter() - start_tts) * 1000)
         
         # Calculate relative static URL path (served statically via /temp/audio/...)
@@ -206,7 +192,7 @@ async def post_chat(
         # 7. Return JSON response containing transcription, text response, audio URL, and latency metrics
         return ChatVoiceResponse(
             transcript=user_prompt,
-            response=display_text,
+            response=assistant_reply,
             audio_url=audio_url,
             latency_ms=total_ms,
             latency_profile=latency_profile
@@ -394,27 +380,13 @@ async def process_and_respond(audio_chunks, websocket: WebSocket, session_id: st
         logger.info(f"WS LLM Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
         
-        # Parse potential bilingual format: [HINDI] ... [ENGLISH] ...
-        speech_text = assistant_reply
-        display_text = assistant_reply
-        if "[HINDI]" in assistant_reply and "[ENGLISH]" in assistant_reply:
-            try:
-                parts = assistant_reply.split("[ENGLISH]")
-                hindi_part = parts[0].replace("[HINDI]", "").strip()
-                english_part = parts[1].strip()
-                speech_text = hindi_part
-                display_text = english_part
-                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (English): '{display_text}'")
-            except Exception as pe:
-                logger.error(f"Failed to parse bilingual reply: {pe}")
-        
-        output_wav_path = await tts_service.speak(speech_text)
+        output_wav_path = await tts_service.speak(assistant_reply)
         pcm_bytes = get_resampled_pcm16_bytes(output_wav_path, target_sr=16000, volume_multiplier=volume_multiplier)
         
         await websocket.send_json({
             "event": "speaking",
             "transcript": user_prompt,
-            "response": display_text
+            "response": assistant_reply
         })
         
         chunk_size = 2048
