@@ -154,14 +154,16 @@ async def post_chat(
             user_prompt = "[Silence]"
             
         # 4. Fetch context and add user message
+        conversation_service.add_message(session_id, "user", user_prompt)
         history = conversation_service.get_history(session_id)
         system_prompt = conversation_service.get_system_prompt(user_prompt)
         messages_to_send = [{"role": "system", "content": system_prompt}] + history
-        conversation_service.add_message(session_id, "user", user_prompt)
         
         # 5. Fetch response from LM Studio LLM (measure LLM latency)
         start_llm = time.perf_counter()
         assistant_reply = await llm_service.get_response(messages_to_send)
+        if not assistant_reply:
+            assistant_reply = "I'm sorry, I couldn't generate a reply. Please try again."
         llm_ms = int((time.perf_counter() - start_llm) * 1000)
         logger.info(f"Assistant Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
@@ -248,13 +250,15 @@ async def post_chat_text(request: ChatTextRequest):
     """Processes text chat input -> queries LM Studio -> returns text response."""
     start_total = time.perf_counter()
     try:
+        conversation_service.add_message(request.session_id, "user", request.text)
         history = conversation_service.get_history(request.session_id)
         system_prompt = conversation_service.get_system_prompt(request.text)
         messages_to_send = [{"role": "system", "content": system_prompt}] + history
-        conversation_service.add_message(request.session_id, "user", request.text)
         
         start_llm = time.perf_counter()
         reply = await llm_service.get_response(messages_to_send)
+        if not reply:
+            reply = "I'm sorry, I couldn't generate a reply. Please try again."
         llm_ms = int((time.perf_counter() - start_llm) * 1000)
         
         conversation_service.add_message(request.session_id, "assistant", reply)
@@ -362,15 +366,17 @@ async def process_and_respond(audio_chunks, websocket: WebSocket, session_id: st
             return
             
         system_vol_msg = handle_volume_change(user_prompt)
+        conversation_service.add_message(session_id, "user", user_prompt)
         history = conversation_service.get_history(session_id)
         system_prompt = conversation_service.get_system_prompt(user_prompt)
         messages_to_send = [{"role": "system", "content": system_prompt}] + history
-        conversation_service.add_message(session_id, "user", user_prompt)
         
         if system_vol_msg:
             messages_to_send.append({"role": "system", "content": system_vol_msg})
             
         assistant_reply = await llm_service.get_response(messages_to_send)
+        if not assistant_reply:
+            assistant_reply = "I'm sorry, I couldn't generate a reply. Please try again."
         logger.info(f"WS LLM Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
         
