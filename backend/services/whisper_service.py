@@ -37,7 +37,7 @@ class WhisperService:
         try:
             segments, info = self.model.transcribe(
                 audio_path,
-                language=None,
+                language="en",
                 beam_size=1,
                 vad_filter=True,
                 vad_parameters=dict(

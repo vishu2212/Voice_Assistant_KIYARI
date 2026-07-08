@@ -22,12 +22,12 @@ ota:
   - platform: esphome
 
 wifi:
-  ssid: "Lucifer"
-  password: "12345678"
+  ssid: "Vishu"
+  password: "Phalswal@dce"
 
   ap:
-    ssid: "Lucifer"
-    password: "12345678"
+    ssid: "Vishu"
+    password: "Phalswal@dce"
 
 captive_portal:
 
