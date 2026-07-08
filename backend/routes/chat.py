@@ -361,7 +361,7 @@ async def process_and_respond(audio_chunks, websocket: WebSocket, session_id: st
             for i in range(0, len(pcm_bytes), chunk_size):
                 chunk = pcm_bytes[i:i+chunk_size]
                 await websocket.send_bytes(chunk)
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.05)
             await websocket.send_json({"event": "done"})
             return
             
@@ -393,7 +393,7 @@ async def process_and_respond(audio_chunks, websocket: WebSocket, session_id: st
         for i in range(0, len(pcm_bytes), chunk_size):
             chunk = pcm_bytes[i:i+chunk_size]
             await websocket.send_bytes(chunk)
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.05)
             
         await websocket.send_json({"event": "done"})
         
