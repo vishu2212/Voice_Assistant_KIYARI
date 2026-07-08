@@ -168,17 +168,17 @@ async def post_chat(
         logger.info(f"Assistant Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
         
-        # Parse potential bilingual format: [HINDI] ... [HINGLISH] ...
+        # Parse potential bilingual format: [HINDI] ... [ENGLISH] ...
         speech_text = assistant_reply
         display_text = assistant_reply
-        if "[HINDI]" in assistant_reply and "[HINGLISH]" in assistant_reply:
+        if "[HINDI]" in assistant_reply and "[ENGLISH]" in assistant_reply:
             try:
-                parts = assistant_reply.split("[HINGLISH]")
+                parts = assistant_reply.split("[ENGLISH]")
                 hindi_part = parts[0].replace("[HINDI]", "").strip()
-                hinglish_part = parts[1].strip()
+                english_part = parts[1].strip()
                 speech_text = hindi_part
-                display_text = hinglish_part
-                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (Hinglish): '{display_text}'")
+                display_text = english_part
+                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (English): '{display_text}'")
             except Exception as pe:
                 logger.error(f"Failed to parse bilingual reply: {pe}")
         
@@ -394,17 +394,17 @@ async def process_and_respond(audio_chunks, websocket: WebSocket, session_id: st
         logger.info(f"WS LLM Reply: '{assistant_reply}'")
         conversation_service.add_message(session_id, "assistant", assistant_reply)
         
-        # Parse potential bilingual format: [HINDI] ... [HINGLISH] ...
+        # Parse potential bilingual format: [HINDI] ... [ENGLISH] ...
         speech_text = assistant_reply
         display_text = assistant_reply
-        if "[HINDI]" in assistant_reply and "[HINGLISH]" in assistant_reply:
+        if "[HINDI]" in assistant_reply and "[ENGLISH]" in assistant_reply:
             try:
-                parts = assistant_reply.split("[HINGLISH]")
+                parts = assistant_reply.split("[ENGLISH]")
                 hindi_part = parts[0].replace("[HINDI]", "").strip()
-                hinglish_part = parts[1].strip()
+                english_part = parts[1].strip()
                 speech_text = hindi_part
-                display_text = hinglish_part
-                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (Hinglish): '{display_text}'")
+                display_text = english_part
+                logger.info(f"Parsed bilingual reply - Speech (Hindi): '{speech_text}', Display (English): '{display_text}'")
             except Exception as pe:
                 logger.error(f"Failed to parse bilingual reply: {pe}")
         
