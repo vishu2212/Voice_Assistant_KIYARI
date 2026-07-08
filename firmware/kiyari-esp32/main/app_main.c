@@ -76,35 +76,119 @@ static void update_state(app_state_t new_state) {
     g_state = new_state;
     if (!display_device.initialized) return;
 
-    oled_clear(&display_device);
-    oled_print_string(&display_device, 0, 1, "KIYARI");
-
-    switch (g_state) {
-        case APP_BOOT:
-            oled_print_string(&display_device, 0, 3, "Booting...");
-            break;
-        case APP_WIFI_CONNECTING:
-            oled_print_string(&display_device, 0, 3, "Connecting WiFi...");
-            break;
-        case APP_IDLE:
-            oled_print_string(&display_device, 0, 3, "Connected");
-            oled_print_string(&display_device, 0, 4, "Ready");
-            oled_print_string(&display_device, 0, 6, "Press BOOT to speak");
-            break;
-        case APP_LISTENING:
-            oled_print_string(&display_device, 0, 3, "Listening...");
-            break;
-        case APP_PROCESSING:
-            oled_print_string(&display_device, 0, 3, "Thinking...");
-            break;
-        case APP_SPEAKING:
-            oled_print_string(&display_device, 0, 3, "Speaking...");
-            break;
-        case APP_ERROR:
-            oled_print_string(&display_device, 0, 3, "Error occurred");
-            break;
+    // For static states, render immediately
+    if (g_state == APP_BOOT || g_state == APP_WIFI_CONNECTING || g_state == APP_IDLE || g_state == APP_ERROR) {
+        oled_clear(&display_device);
+        oled_print_string(&display_device, 0, 1, "KIYARI");
+        switch (g_state) {
+            case APP_BOOT:
+                oled_print_string(&display_device, 0, 3, "Booting...");
+                break;
+            case APP_WIFI_CONNECTING:
+                oled_print_string(&display_device, 0, 3, "Connecting WiFi...");
+                break;
+            case APP_IDLE:
+                oled_print_string(&display_device, 0, 3, "Connected");
+                oled_print_string(&display_device, 0, 4, "Ready");
+                oled_print_string(&display_device, 0, 6, "Press BOOT to speak");
+                break;
+            case APP_ERROR:
+                oled_print_string(&display_device, 0, 3, "Error occurred");
+                break;
+            default:
+                break;
+        }
+        oled_refresh(&display_device);
     }
-    oled_refresh(&display_device);
+}
+
+static void draw_waveform_animation(oled_display_t* dev, int frame) {
+    oled_clear(dev);
+    oled_print_string(dev, 0, 1, "KIYARI");
+    oled_print_string(dev, 0, 3, "Listening...");
+    
+    // Siri-style flowing waveform
+    float phase = frame * 0.3f;
+    float max_amp = 6.0f + 3.0f * sinf(frame * 0.15f);
+    
+    for (int x = 0; x < 128; x++) {
+        int y = 48 + (int)(max_amp * sinf((x * 0.12f) - phase));
+        if (y >= 0 && y < 64) {
+            oled_draw_pixel(dev, x, y, true);
+            if (y + 1 < 64) oled_draw_pixel(dev, x, y + 1, true);
+        }
+    }
+}
+
+static void draw_thinking_animation(oled_display_t* dev, int frame) {
+    oled_clear(dev);
+    oled_print_string(dev, 0, 1, "KIYARI");
+    oled_print_string(dev, 0, 3, "Thinking...");
+    
+    int cx = 64;
+    int cy = 48;
+    int radius = 8;
+    int active_dot = frame % 8;
+    
+    for (int i = 0; i < 8; i++) {
+        float angle = i * (2.0f * 3.14159f / 8.0f);
+        int dx = cx + (int)(radius * cosf(angle));
+        int dy = cy + (int)(radius * sinf(angle));
+        
+        if (i == active_dot) {
+            for (int xx = -1; xx <= 1; xx++) {
+                for (int yy = -1; yy <= 1; yy++) {
+                    oled_draw_pixel(dev, dx + xx, dy + yy, true);
+                }
+            }
+        } else {
+            oled_draw_pixel(dev, dx, dy, true);
+        }
+    }
+}
+
+static void draw_speaking_animation(oled_display_t* dev, int frame) {
+    // Tiny bouncing visualizer equalizer bars in the top right corner (x=95 to 127, y=0 to 15)
+    int bar_x[] = {100, 106, 112, 118};
+    for (int b = 0; b < 4; b++) {
+        int height = 2 + (int)(8.0f * (1.0f + sinf(frame * 0.4f + b * 1.5f)) / 2.0f);
+        int x = bar_x[b];
+        for (int y = 14; y > 14 - height; y--) {
+            oled_draw_pixel(dev, x, y, true);
+            oled_draw_pixel(dev, x + 1, y, true);
+            oled_draw_pixel(dev, x + 2, y, true);
+        }
+    }
+}
+
+static void display_animation_task(void *pvParameters) {
+    int frame = 0;
+    while (true) {
+        if (g_state == APP_LISTENING) {
+            draw_waveform_animation(&display_device, frame);
+            oled_refresh(&display_device);
+            frame++;
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else if (g_state == APP_PROCESSING) {
+            draw_thinking_animation(&display_device, frame);
+            oled_refresh(&display_device);
+            frame++;
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else if (g_state == APP_SPEAKING) {
+            // Erase the top-right block (x=95 to 127, y=0 to 15) in local buffer
+            for (int x = 95; x < 128; x++) {
+                for (int y = 0; y < 16; y++) {
+                    oled_draw_pixel(&display_device, x, y, false);
+                }
+            }
+            draw_speaking_animation(&display_device, frame);
+            oled_refresh(&display_device);
+            frame++;
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+    }
 }
 
 static void audio_playback_task(void *pvParameters) {
@@ -339,6 +423,9 @@ void app_main(void)
 
     // Create high-priority audio playback task pinned to Core 1
     xTaskCreatePinnedToCore(audio_playback_task, "audio_playback", 4096, NULL, 5, NULL, 1);
+
+    // Create background OLED display animation task
+    xTaskCreate(display_animation_task, "display_anim", 4096, NULL, 2, NULL);
 
     // 6. Test Speaker Tone Playback (440Hz for 500ms)
     if (display_device.initialized) {
