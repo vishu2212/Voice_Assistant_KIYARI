@@ -1,0 +1,79 @@
+esphome:
+  name: zyra
+  friendly_name: ZYRA
+  on_boot:
+    priority: -100
+    then:
+      - delay: 2s
+      - media_player.play_media:
+          id: zyra_player
+          media_url: "http://10.103.253.164:8000/hello.wav"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: "Vishu"
+  password: "Phalswal@dce"
+
+  ap:
+    ssid: "Vishu"
+    password: "Phalswal@dce"
+
+captive_portal:
+
+psram:
+  mode: octal
+
+web_server:
+  port: 80
+
+button:
+  - platform: restart
+    name: "Device Restart"
+  - platform: template
+    name: "Play Hello"
+    id: play_hello_btn
+    on_press:
+      then:
+        - media_player.play_media:
+            id: zyra_player
+            media_url: "http://10.103.253.164:8000/hello.wav"
+  - platform: template
+    name: "Play Beep"
+    id: play_beep_btn
+    on_press:
+      then:
+        - media_player.play_media:
+            id: zyra_player
+            media_url: "http://10.103.253.164:8000/beep.wav"
+
+i2s_audio:
+  - id: i2s_out
+    i2s_lrclk_pin: GPIO16
+    i2s_bclk_pin: GPIO15
+
+speaker:
+  - platform: i2s_audio
+    id: zyra_speaker
+    i2s_audio_id: i2s_out
+    i2s_dout_pin: GPIO7
+    dac_type: external
+    sample_rate: 16000
+
+media_player:
+  - platform: speaker
+    id: zyra_player
+    name: "ZYRA Speaker"
+    announcement_pipeline:
+      speaker: zyra_speaker
+    buffer_size: 100000

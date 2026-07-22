@@ -23,20 +23,20 @@ class ConversationService:
             except Exception as e:
                 logger.error(f"Failed to read compiled_knowledge.txt: {e}")
 
-        # 3. Load custom game knowledge if exists
-        self.game_knowledge = ""
-        knowledge_file = settings.BASE_DIR / "game_knowledge.md"
+        # 3. Load custom assistant knowledge if exists
+        self.assistant_knowledge = ""
+        knowledge_file = settings.BASE_DIR / "knowledge.md"
         if knowledge_file.exists():
             try:
                 with open(knowledge_file, "r", encoding="utf-8") as f:
-                    self.game_knowledge = f.read().strip()
-                logger.info("Loaded custom game knowledge from game_knowledge.md")
+                    self.assistant_knowledge = f.read().strip()
+                logger.info("Loaded custom assistant knowledge from knowledge.md")
             except Exception as e:
-                logger.error(f"Failed to read game_knowledge.md: {e}")
+                logger.error(f"Failed to read knowledge.md: {e}")
 
         # 4. Voice assistant system prompt to keep responses natural and spoken-friendly
         self.base_system_prompt = (
-            "You are KIYARI, a helpful offline English voice assistant. "
+            "You are JARVIS, a helpful offline English voice assistant. "
             "You speak and understand English. "
             "You MUST reply in English only. Never write or reply in Hindi or Hinglish. "
             "Always give natural, informative, and spoken-friendly answers (typically 2 to 3 sentences, around 40-60 words). "
@@ -79,12 +79,12 @@ class ConversationService:
         """Constructs a compact system prompt dynamically tailored to the user's query."""
         prompt = self.base_system_prompt
         
-        if self.game_knowledge:
-            prompt += f"\n\nCore Kiyari Rules:\n{self.game_knowledge}"
+        if self.assistant_knowledge:
+            prompt += f"\n\nAssistant Knowledge:\n{self.assistant_knowledge}"
             
         relevant_docs = self.retrieve_relevant_knowledge(query)
         if relevant_docs:
-            prompt += f"\n\nRelevant rules for this question:\n{relevant_docs}"
+            prompt += f"\n\nRelevant knowledge for this question:\n{relevant_docs}"
             
         return prompt
 

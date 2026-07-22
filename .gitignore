@@ -5,9 +5,11 @@ backend/.venv/
 *.pyc
 
 # ESP-IDF build output
-firmware/kiyari-esp32/build/
-firmware/kiyari-esp32/sdkconfig
-firmware/kiyari-esp32/sdkconfig.old
+build/
+**/build/
+**/sdkconfig
+**/sdkconfig.old
+**/managed_components/
 
 # Temporary audio directories & files
 backend/temp/

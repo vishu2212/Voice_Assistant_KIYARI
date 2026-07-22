@@ -1,209 +1,186 @@
-# KIYARI Project Repository
+# 🎙️ ZYRA — Modular AI-Powered Voice Companion
 
-This repository hosts the code, firmware, and assets for **KIYARI**, a fully offline voice assistant project utilizing an ESP32-S3 and local server backends.
+> **Meet ZYRA:** A privacy-first, low-latency, modular AI voice companion built with hardware integration at heart. Powered by ESP32-S3, real-time WebSockets, local Speech-to-Text, local LLMs, and neural Text-to-Speech — 100% offline with zero cloud dependency!
 
-## 📂 Repository Structure
+---
 
-```text
-KIYARI/
-│
-├── firmware/
-│   ├── esphome/        # ESPHome YAML configurations and startup sounds
-│   │   ├── kiyari.yaml
-│   │   └── sounds/     # local startup/alert wav files
-│   └── kiyari-esp32/   # ESP-IDF firmware modular C codebase
-│       ├── main/       # Application bootloader and state manager
-│       │   ├── app_main.c
-│       │   ├── app_main.h
-│       │   ├── config.h
-│       │   └── app_state.h
-│       ├── components/ # Custom modular hardware components
-│       │   ├── microphone/ # INMP441 standard I2S recorder driver
-│       │   ├── speaker/    # MAX98357A standard I2S playback driver
-│       │   ├── display/    # SSD1306 standard I2C OLED driver
-│       │   ├── network/    # Station Wi-Fi manager controller
-│       │   ├── api/        # PCM buffer and WAV formatting compiler
-│       │   ├── assistant/  # HTTP request and JSON parsing manager
-│       │   ├── storage/    # NVS flash flash initialization component
-│       │   ├── button/     # GPIO push-button listener component
-│       │   └── led/        # Status LED indicator driver component
-│       ├── assets/     # Local static assets
-│       ├── managed_components/ # External registered library packages
-│       └── sdkconfig.defaults # Default build configs
-│
-│
-├── backend/            # FastAPI Offline Speech/LLM/TTS Pipeline
-│   ├── server.py
-│   ├── config.py
-│   ├── requirements.txt
-│   ├── routes/
-│   ├── services/
-│   ├── utils/
-│   ├── temp/
-│   └── venv/
-│
-├── models/             # Directory to host local model weights
-│   ├── whisper/        # faster-whisper models
-│   └── piper/          # piper voice models
-│
-├── audio/              # Reference audio files / captures
-│   ├── startup/        # system startup chime/alert
-│   ├── listening/      # trigger/listening chime
-│   ├── thinking/       # processing query sound
-│   ├── success/        # positive transaction sound
-│   └── error/          # alert/connection error sound
-│
-├── docs/               # Technical designs and documentations
-└── README.md           # Main documentation file
+## 📸 Project Showcase
+
+### 📸 Hardware Setup
+Here is the assembled ZYRA hardware satellite client featuring the ESP32-S3 microcontroller, INMP441 digital I2S microphone, MAX98357A DAC audio amplifier with speaker, and the OLED status display.
+
+![ZYRA Hardware Setup](Screenshots/hardware.png)
+
+---
+
+### 🖥️ Backend Intelligence & Real-time Console
+The local FastAPI backend coordinating real-time WebSockets, audio streaming, Whisper transcription, local LLM responses, and Piper TTS synthesis.
+
+![ZYRA Backend Screenshot](Screenshots/Backend.png)
+
+---
+
+### 🎬 Live Demo Video
+Experience ZYRA in action! Watch how ZYRA captures voice commands, processes reasoning locally, and responds with natural voice synthesis:
+
+https://github.com/user-attachments/assets/demo-video
+
+> 📹 **Local Video File:** You can also find the raw full HD video clip at [`Screenshots/Demo Video.mp4`](Screenshots/Demo%20Video.mp4).
+
+---
+
+## ✨ Why ZYRA? (A Humanised Perspective)
+
+Have you ever wanted an intelligent voice assistant like JARVIS or Alexa, but wished it was **completely private**, **fully customizable**, and didn't send every word spoken in your home to a distant cloud server?
+
+That is exactly why **ZYRA** was created!
+
+ZYRA splits the workload smartly between two partners:
+1. **The Satellite (Hardware Client):** A lightweight, low-cost ESP32-S3 microcontroller placed on your desk. It acts as the "ears, mouth, and eyes" of the assistant — capturing your voice via an INMP441 I2S mic, giving visual feedback on a tiny OLED screen, and speaking back through a clear I2S DAC speaker.
+2. **The Brain (Local PC Server):** A Python FastAPI server that runs locally on your PC. It takes raw digital audio over WebSockets, transcribes it in real-time with **Faster-Whisper**, thinks using **Qwen 2.5** (via LM Studio), and speaks back using human-sounding neural voices with **Piper TTS**.
+
+Whether you want a desk companion, a home automation trigger, or a voice interface for a robotics project, ZYRA gives you 100% control over every single line of code and piece of hardware.
+
+---
+
+## 🏗️ Architecture Diagram
+
+Here is how data flows seamlessly between the **Hardware Satellite** and the **Local AI Brain**:
+
+```mermaid
+graph TD
+    subgraph ESP32-S3 Satellite Client "Ears, Eyes & Mouth"
+        A[🎤 INMP441 I2S Mic / BOOT Button] -->|16kHz PCM16 Audio Stream| B[Persistent WebSocket Client]
+        B -->|Audio Playback Stream| C[🔊 MAX98357A DAC & Speaker]
+        B -->|OLED State Events & Text| D[📺 SH1106 / SSD1306 OLED Display]
+    end
+
+    subgraph Local PC Brain "The AI Engine"
+        B <===>|Full-Duplex WebSockets| E[FastAPI Server Controller]
+        E -->|WAV Audio Chunk| F[⚡ Faster-Whisper STT]
+        F -->|Transcribed Text| G[🧠 Qwen 2.5 Instruct LLM]
+        G -->|Assistant Response| H[🎙️ Piper Neural TTS]
+        H -->|PCM Audio Payload| I[🔊 Sound Resampler & DSP]
+        I -->|Synthesized PCM Stream| E
+    end
 ```
 
 ---
 
-## 🛠 Prerequisites & Installation
+## 🚀 Key Features
 
-### 1. Python Environment
-This project requires Python 3.11+.
+- 🔒 **100% Offline & Private:** Zero cloud APIs required. Your voice data never leaves your local network.
+- ⚡ **Ultra Low-Latency WebSockets:** Binary 16kHz PCM audio streaming over standard WebSockets ensures instant response times.
+- 🗣️ **Local Multilingual STT & TTS:** Handles English, Hindi, and Hinglish with Whisper transcription and Piper neural voice models (`en_US-lessac` and `hi_IN-pratham`).
+- 📺 **Dynamic OLED Visualizer:** Real-time state indicators (`Connecting`, `Ready`, `Listening...`, `Thinking...`, `Speaking...`) with animated visualizers and scrolling text.
+- 🎛️ **Dual Trigger Modes:** Choose between hands-free wake word activation ("Hey Zyra") or push-to-talk using the hardware BOOT button.
+- 🔊 **Digital Volume Control:** Dynamic PCM amplitude scaling with clipping protection built right into the backend.
+- 🔌 **Modular C Firmware:** Developed using ESP-IDF v5.5.4 and FreeRTOS for smooth multitasking and memory optimization.
 
-Change directory to the `backend` folder, set up a virtual environment, and install dependencies:
-```bash
-cd backend
-python -m venv venv
-.\venv\Scripts\activate     # Windows
-source venv/bin/activate   # Linux/macOS
-pip install -r requirements.txt
-```
+---
 
-### 2. LM Studio Setup
-1. Download and install [LM Studio](https://lmstudio.ai/).
-2. Download a compatible model, recommended: `qwen2.5-7b-instruct`.
-3. Go to the **Local Server** tab (developer icon on the left panel).
-4. Set port to `1234` and start the server.
-5. Verify the server is running at `http://127.0.0.1:1234/v1`.
+## 🔌 Hardware Wiring & Pin Mapping
 
-### 3. Piper TTS Setup
-1. Download the precompiled Piper standalone binary for your OS from the [Piper GitHub Releases](https://github.com/rhasspy/piper/releases).
-2. Extract the archive (e.g., to `C:\piper\`).
-3. Download an ONNX voice model and its `.json` config file (e.g., `en_US-lessac-medium.onnx` and `en_US-lessac-medium.onnx.json`) from the [Piper Voice list](https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en_US-lessac-medium.tar.gz).
-4. Update the paths in `backend/config.py` to point to your `piper.exe` and voice `.onnx` model files:
-   ```python
-   PIPER_EXECUTABLE = "C:\\piper\\piper.exe"
-   PIPER_VOICE_MODEL = "C:\\piper\\voices\\en_US-lessac-medium.onnx"
+Here is the exact pin configuration used to wire the ZYRA satellite to an **ESP32-S3 DevKitC-1** board:
+
+| Module | Pin Name | ESP32-S3 Pin | Description / Function |
+| :--- | :--- | :--- | :--- |
+| **INMP441 Mic** | `SCK` | **GPIO 5** | I2S Serial Clock |
+| | `WS` | **GPIO 4** | I2S Word Select (LR Clock) |
+| | `SD` | **GPIO 6** | I2S Serial Data Out |
+| | `L/R` | `GND` | Mono Left Channel |
+| | `VDD` / `GND` | `3.3V` / `GND` | Power Supply |
+| **MAX98357A DAC** | `LRC` | **GPIO 16** | I2S Left-Right Clock |
+| | `BCLK` | **GPIO 15** | I2S Bit Clock |
+| | `DIN` | **GPIO 7** | I2S Data Input |
+| | `Vin` / `GND` | `5V` / `GND` | 5V Power for max volume output |
+| **OLED Display** | `SDA` | **GPIO 8** | I2C Data Line |
+| | `SCL` | **GPIO 9** | I2C Clock Line |
+| | `VDD` / `GND` | `3.3V` / `GND` | Power (`0x3C` I2C Address) |
+| **User Input** | `BOOT Button` | **GPIO 0** | Hold-to-Talk Push Button |
+| **Status LED** | `RGB LED` | **GPIO 48** | Onboard WS2812B Addressable LED |
+
+---
+
+## 🛠️ Software Stack
+
+- **Firmware:** ESP-IDF v5.5.4 (C/C++), FreeRTOS kernel, `esp_websocket_client`, U8g2 OLED drivers.
+- **Backend Framework:** Python 3.13, FastAPI, Uvicorn ASGI server, WebSockets.
+- **AI Models:**
+  - **Speech-to-Text (STT):** `faster-whisper` (CTranslate2 implementation of OpenAI Whisper).
+  - **Large Language Model (LLM):** `Qwen 2.5 7B Instruct` hosted locally via [LM Studio](https://lmstudio.ai/).
+  - **Text-to-Speech (TTS):** `piper-tts` ONNX local engine.
+
+---
+
+## ⚡ Quick Start Guide
+
+### 1️⃣ Prepare the AI Brain (Backend)
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/vishu2212/Voice_Assistant_KIYARI.git
+   cd Voice_Assistant_KIYARI/backend
+   ```
+2. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv venv
+   # On Windows:
+   .\venv\Scripts\activate
+   # On Linux/macOS:
+   source venv/bin/activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start **LM Studio**, download `qwen2.5-7b-instruct`, and start the local server on port `1234`.
+5. Run the FastAPI backend:
+   ```bash
+   python server.py
+   ```
+
+### 2️⃣ Flash the Hardware Satellite (ESP32-S3 Firmware)
+
+1. Open your ESP-IDF command prompt (v5.5.4 recommended).
+2. Navigate to the custom firmware directory:
+   ```bash
+   cd firmware/zyra-esp32
+   ```
+3. Set target and compile:
+   ```bash
+   idf.py set-target esp32s3
+   idf.py build
+   ```
+4. Flash the board and open serial monitor (replace `COMX` with your COM port):
+   ```bash
+   idf.py -p COMX flash monitor
    ```
 
 ---
 
-## 🚀 Running the Server
+## 🎮 How to Interact with ZYRA
 
-Make sure you are in the `backend` directory, activate the virtual environment, and start the FastAPI application:
-```bash
-cd backend
-python server.py
-```
-Or run via Uvicorn:
-```bash
-uvicorn server:app --host 0.0.0.0 --port 8000
-```
+1. **Power Up:** Connect the ESP32-S3 via USB-C. You will see `Starting ZYRA...` followed by `Connecting WiFi...` on the OLED screen.
+2. **Ready Prompt:** Once connected, ZYRA plays a welcome chime and says *"Hello, I am Zyra."* The screen displays `Ready. Say: 'Hey Zyra' or press BOOT`.
+3. **Ask a Question:**
+   - **Hands-Free:** Say *"Hey Zyra"* to trigger listening mode.
+   - **Manual:** Press and hold the physical **BOOT button (GPIO 0)** while speaking, then release when finished.
+4. **Watch ZYRA Think & Speak:** ZYRA will show `Thinking...` while analyzing your query, then scroll the answer on screen while speaking out loud through the speaker!
 
 ---
 
-## 📡 API Reference & Examples
+## 🔮 Future Enhancements & Roadmap
 
-### 1. Health Check
-*   **Endpoint:** `GET /health`
-*   **Description:** Verifies that the server is online.
-*   **Example curl:**
-    ```bash
-    curl http://localhost:8000/health
-    ```
-*   **Response:**
-    ```json
-    {"status": "ok"}
-    ```
-
-### 2. Available Models
-*   **Endpoint:** `GET /models`
-*   **Description:** Queries and returns the models currently running in LM Studio.
-*   **Example curl:**
-    ```bash
-    curl http://localhost:8000/models
-    ```
-*   **Response:**
-    ```json
-    {"models": ["qwen2.5-7b-instruct"]}
-    ```
-
-### 3. Chat Pipeline (Voice-to-Voice)
-*   **Endpoint:** `POST /chat`
-*   **Description:** Uploads a captured audio file, transcribes it, runs the LLM, synthesizes the response, and streams back the generated `.wav` audio.
-*   **Input parameters (multipart/form-data):**
-    *   `audio`: Audio binary file (WAV or raw PCM).
-    *   `session_id` (optional): Unique string identifier to maintain individual chat history state.
-*   **Example curl:**
-    ```bash
-    curl -F "audio=@test_input.wav" -F "session_id=user_1" --output response.wav http://localhost:8000/chat
-    ```
-*   **Response:** Binary audio stream (content-type: `audio/wav`).
-
-### 4. Transcribe Only (Speech-to-Text)
-*   **Endpoint:** `POST /transcribe`
-*   **Description:** Transcribes audio and returns the text payload only.
-*   **Example curl:**
-    ```bash
-    curl -F "audio=@test_input.wav" http://localhost:8000/transcribe
-    ```
-*   **Response:**
-    ```json
-    {"text": "Hello, how are you today?"}
-    ```
-
-### 5. Speak (Text-to-Speech)
-*   **Endpoint:** `POST /speak`
-*   **Description:** Synthesizes the provided text into a downloadable WAV file.
-*   **Example curl:**
-    ```bash
-    curl -X POST -H "Content-Type: application/json" -d "{\"text\":\"Hello, I am KIYARI\"}" --output speech.wav http://localhost:8000/speak
-    ```
-*   **Response:** Binary audio stream (content-type: `audio/wav`).
+- 🔋 **Complete Portability:** LiPo battery management (TP4056 + 5V Booster) for a pocket-sized wireless assistant.
+- 📡 **Access Point (AP) Mode:** Host the server directly on a phone via Termux without needing an external Wi-Fi router.
+- 🧠 **On-Chip Inference:** Lightweight local command recognition with ESP-Skainet directly on the ESP32-S3.
+- 🏠 **Smart Home Automation:** Local Home Assistant & MQTT protocol integration for voice-controlled lights and plugs.
 
 ---
 
-## 🔌 ESPHome / ESP32 Integration
+## 📄 License & Acknowledgments
 
-To hook your ESP32-S3 microphone and speaker up to the backend, utilize ESPHome's voice assistant or HTTP request component actions.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more details.
 
-### Example ESPHome YAML logic:
-
-```yaml
-# HTTP request to send captured audio and play output
-http_request:
-  timeout: 30s
-
-# Triggered when button is pressed and audio is recorded
-on_button_press:
-  then:
-    - http_request.post:
-        url: !lambda |-
-          return "http://YOUR_SERVER_IP:8000/chat";
-        headers:
-          Content-Type: "multipart/form-data"
-        files:
-          - name: "audio"
-            filename: "capture.wav"
-            # Captures buffer from mic
-            buffer: mic_buffer
-        # Target action when WAV is returned
-        on_response:
-          then:
-            - media_player.play_media:
-                id: kiyari_player
-                media_url: !lambda |-
-                  return response.body_url;
-```
-
----
-
-## 🛡 System Design & Error Handling
-
-*   **Memory Management:** The server automatically launches an hourly background sweeper that deletes temporary WAV files older than 1 hour. In addition, every API route deletes temporary files immediately after serving using FastAPI `BackgroundTasks`.
-*   **Device Fallback:** `faster-whisper` automatically searches for a local CUDA setup. If no CUDA driver or GPU is available, it gracefully falls back to CPU execution using optimized `int8` quantization.
-*   **PCM Wrapper:** The `AudioService` intercepts raw uploads. If an upload lacks a `RIFF` WAV header, it automatically assumes it is a raw `16-bit 16kHz Mono PCM` stream and wraps it into a correct WAV header before feeding it to the transcription engine.
+Built with ❤️ using ESP32-S3, FastAPI, Whisper, Qwen, and Piper TTS.

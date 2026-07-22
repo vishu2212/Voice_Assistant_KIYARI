@@ -36,6 +36,15 @@ tts_service = TTSService()
 audio_service = AudioService()
 conversation_service = ConversationService()
 
+# Initialize openwakeword model globally at module level to prevent connection-blocking latencies
+oww_model = None
+try:
+    from openwakeword.model import Model
+    oww_model = Model(wakeword_models=["hey_jarvis", "hey_mycroft"], device="cpu")
+    logger.info("Loaded global openwakeword models: hey_jarvis, hey_mycroft")
+except Exception as ex:
+    logger.error(f"Failed to load global openwakeword model: {ex}", exc_info=True)
+
 # Global volume multiplier (from 0.1 to 1.5, default 0.8)
 volume_multiplier = 0.8
 
@@ -418,11 +427,20 @@ async def websocket_chat_endpoint(websocket: WebSocket):
     audio_chunks = []
     is_recording = False
     
+    wake_word_buffer = np.array([], dtype=np.int16)
+    silence_samples = 0
+    VAD_THRESHOLD = 500.0
+    SILENCE_TIMEOUT_S = 1.6
+    MAX_RECORD_DURATION_S = 8.0
+    
     await websocket.send_json({"event": "connected"})
     
     try:
         while True:
             message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                logger.info("WS: WebSocket disconnect message received.")
+                break
             
             if "text" in message:
                 try:
@@ -435,7 +453,8 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                 if event == "start":
                     is_recording = True
                     audio_chunks = []
-                    logger.info("WS: Recording started by client.")
+                    silence_samples = 0
+                    logger.info("WS: Recording started by client (manual trigger).")
                     await websocket.send_json({"event": "listening"})
                     
                 elif event == "stop":
@@ -444,19 +463,95 @@ async def websocket_chat_endpoint(websocket: WebSocket):
                         continue
                     
                     is_recording = False
-                    logger.info(f"WS: Recording stopped. Collected {len(audio_chunks)} audio chunks.")
+                    logger.info(f"WS: Recording stopped (manual trigger). Collected {len(audio_chunks)} audio chunks.")
                     await process_and_respond(audio_chunks, websocket, session_id)
                     audio_chunks = []
                             
             elif "bytes" in message:
-                if is_recording:
-                    audio_chunks.append(message["bytes"])
+                raw_chunk = message["bytes"]
+                chunk_data = np.frombuffer(raw_chunk, dtype=np.int16)
+                
+                if not hasattr(websocket_chat_endpoint, "stream_count"):
+                    websocket_chat_endpoint.stream_count = 0
+                websocket_chat_endpoint.stream_count += 1
+                if websocket_chat_endpoint.stream_count % 32 == 0:
+                    peak = np.max(np.abs(chunk_data)) if len(chunk_data) > 0 else 0
+                    mean = np.mean(chunk_data) if len(chunk_data) > 0 else 0
+                    logger.info(f"Stream Audio Check: Chunks={websocket_chat_endpoint.stream_count}, Peak={peak}, Mean={mean:.2f}")
+                
+                if not is_recording:
+                    if oww_model is not None:
+                        # Accumulate for wake word detection
+                        wake_word_buffer = np.append(wake_word_buffer, chunk_data)
+                        while len(wake_word_buffer) >= 1280:
+                            to_process = wake_word_buffer[:1280]
+                            wake_word_buffer = wake_word_buffer[1280:]
+                            
+                            # Remove DC offset (subtract mean) to improve wake word detection
+                            to_process_ac = (to_process - np.mean(to_process)).astype(np.int16)
+                            
+                            # Run prediction in a background thread to avoid blocking the asyncio event loop
+                            predictions = await asyncio.to_thread(oww_model.predict, to_process_ac)
+                            triggered = False
+                            
+                            # Log predictions if any model has > 0.1 probability for debugging
+                            max_prob = max(predictions.values()) if predictions else 0.0
+                            if max_prob > 0.1:
+                                logger.info(f"Wake word probabilities: {predictions}")
+                                
+                            for model_name, prob in predictions.items():
+                                if prob > 0.5:
+                                    logger.info(f"Wake word detected: {model_name} (prob: {prob:.2f})")
+                                    triggered = True
+                                    break
+                            
+                            if triggered:
+                                is_recording = True
+                                audio_chunks = [to_process.tobytes()]
+                                silence_samples = 0
+                                logger.info("WS: Wake word triggered! Transitioning to listening state.")
+                                await websocket.send_json({"event": "listening"})
+                                break
+                else:
+                    audio_chunks.append(raw_chunk)
+                    
+                    # Run voice activity detection (VAD) to check for end of speech
+                    chunk_ac = chunk_data.astype(np.float32)
+                    if len(chunk_ac) > 0:
+                        chunk_ac = chunk_ac - np.mean(chunk_ac)
+                        rms = np.sqrt(np.mean(chunk_ac**2))
+                    else:
+                        rms = 0.0
+                        
+                    if rms < VAD_THRESHOLD:
+                        silence_samples += len(chunk_data)
+                    else:
+                        silence_samples = 0
+                        
+                    # Log VAD status every 16 chunks (approx 0.5s) to diagnose threshold tuning
+                    if not hasattr(websocket_chat_endpoint, "chunk_count"):
+                        websocket_chat_endpoint.chunk_count = 0
+                    websocket_chat_endpoint.chunk_count += 1
+                    if websocket_chat_endpoint.chunk_count % 16 == 0:
+                        logger.info(f"VAD Debug: RMS={rms:.1f}, Silence={silence_samples/16000:.2f}s (Threshold: {VAD_THRESHOLD})")
+                        
+                    # Fallback: stop recording if we exceed a maximum duration (e.g. 8 seconds)
+                    duration_s = (len(audio_chunks) * len(chunk_data)) / 16000
+                    if silence_samples / 16000 >= SILENCE_TIMEOUT_S or duration_s >= MAX_RECORD_DURATION_S:
+                        is_recording = False
+                        if duration_s >= MAX_RECORD_DURATION_S:
+                            logger.info(f"WS: Max recording duration reached ({duration_s:.2f}s). Processing...")
+                        else:
+                            logger.info(f"WS: Silence detected (end of speech). Collected {len(audio_chunks)} audio chunks. Processing...")
+                        await process_and_respond(audio_chunks, websocket, session_id)
+                        audio_chunks = []
                     
     except WebSocketDisconnect:
         logger.info("WS: ESP32 WebSocket client disconnected.")
     except Exception as e:
         if isinstance(e, RuntimeError) and "disconnect" in str(e):
-            logger.info("WS: ESP32 WebSocket client disconnected (RuntimeError).")
+            logger.info(f"WS: ESP32 WebSocket client disconnected (RuntimeError: {e})")
+            logger.error("Traceback of RuntimeError:", exc_info=True)
         else:
             logger.error(f"WS Error: {e}", exc_info=True)
 

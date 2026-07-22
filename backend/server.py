@@ -28,7 +28,7 @@ async def periodic_audio_cleanup():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup actions
-    logger.info("Initializing KIYARI Backend Application Lifespan...")
+    logger.info("Initializing ZYRA Backend Application Lifespan...")
     logger.info(f"Target Settings: HOST={settings.HOST}, PORT={settings.PORT}")
     logger.info(f"LM Studio URL: {settings.LM_STUDIO_URL}")
     
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown actions
-    logger.info("Shutting down KIYARI Backend Application Lifespan...")
+    logger.info("Shutting down ZYRA Backend Application Lifespan...")
     cleanup_task.cancel()
     # Wait until cleanup task exits cleanly
     try:
@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI with lifespan context
 app = FastAPI(
-    title="KIYARI Voice Assistant Backend",
-    description="Offline voice assistant service pipeline for ESP32-S3",
+    title="ZYRA Voice Assistant Backend",
+    description="Offline voice assistant service pipeline for ESP32-S3 (ZYRA)",
     version="1.0.0",
     lifespan=lifespan
 )
